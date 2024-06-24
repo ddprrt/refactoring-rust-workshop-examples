@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "clippy",
+    "fibonacci",
+    "errors",
+    "progress",
+    "iterator-ex",
+    "default-trait",
+]

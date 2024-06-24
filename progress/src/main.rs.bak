@@ -1,0 +1,188 @@
+// Step 1
+
+const CLEAR: &str = "\x1B[2J\x1B[1;1H";
+
+fn expensive_calculation(_n: &i32) {
+    std::thread::sleep(std::time::Duration::from_secs(1));
+}
+
+fn main() {
+    let vec: Vec<i32> = (0..10).collect();
+
+    for (e, i) in vec.iter().enumerate() {
+        println!("{}", "*".repeat(e));
+        expensive_calculation(i);
+        println!("{}", CLEAR);
+    }
+}
+
+
+// Step 2
+
+
+struct Progress<Iter> {
+    iter: Iter,
+    i: usize,
+}
+
+impl<Iter> Progress<Iter>
+where
+    Iter: Iterator,
+{
+    fn new(iter: Iter) -> Self {
+        Self { iter, i: 0 }
+    }
+}
+
+impl<Iter> Iterator for Progress<Iter>
+where
+    Iter: Iterator,
+{
+    type Item = Iter::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        println!("{}", CLEAR);
+        println!("{}", "*".repeat(self.i));
+        self.i += 1;
+        self.iter.next()
+    }
+}
+
+fn main() {
+    let vec: Vec<i32> = (0..10).collect();
+
+    for i in Progress::new(vec.iter()) {
+        expensive_calculation(i);
+    }
+}
+
+
+// Step 3
+
+trait ProgressIteratorExt: Sized {
+    fn progress(self) -> Progress<Self>;
+}
+
+impl<Iter> ProgressIteratorExt for Iter
+where
+    Iter: Iterator,
+{
+    fn progress(self) -> Progress<Self> {
+        Progress::new(self)
+    }
+}
+
+fn main() {
+    let vec: Vec<i32> = (0..10).collect();
+
+    for i in vec.iter().progress() {
+        expensive_calculation(i);
+    }
+}
+
+// Step 4
+
+struct Unbounded;
+struct Bounded {
+    bounds: usize,
+    delims: (char, char),
+}
+
+trait ProgressDisplay: Sized {
+    fn display<Iter>(&self, progress: &Progress<Iter, Self>);
+}
+
+impl ProgressDisplay for Unbounded {
+    fn display<Iter>(&self, progress: &Progress<Iter, Self>) {
+        println!("{}", "*".repeat(progress.i));
+    }
+}
+
+struct Progress<Iter, B> {
+    iter: Iter,
+    i: usize,
+    bounds: B,
+}
+
+impl<Iter> Progress<Iter, Unbounded>
+where
+    Iter: Iterator,
+{
+    fn new(iter: Iter) -> Self {
+        Self {
+            iter,
+            i: 0,
+            bounds: Unbounded,
+        }
+    }
+}
+
+impl<Iter, B> Iterator for Progress<Iter, B>
+where
+    Iter: Iterator,
+    B: ProgressDisplay,
+{
+    type Item = Iter::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        println!("{}", CLEAR);
+        self.bounds.display(self);
+        self.i += 1;
+        self.iter.next()
+    }
+}
+
+// Step 5
+
+struct Bounded {
+    bounds: usize,
+    delims: (char, char),
+}
+
+impl ProgressDisplay for Bounded {
+    fn display<Iter>(&self, progress: &Progress<Iter, Self>) {
+        println!(
+            "{}{}{}{}",
+            self.delims.0,
+            "*".repeat(progress.i),
+            " ".repeat(self.bounds - progress.i),
+            self.delims.1
+        )
+    }
+}
+
+impl<Iter> Progress<Iter, Unbounded>
+where
+    Iter: ExactSizeIterator,
+{
+    pub fn with_bounds(self) -> Progress<Iter, Bounded> {
+        let len = self.iter.len();
+        Progress {
+            iter: self.iter,
+            i: self.i,
+            bounds: Bounded {
+                bounds: len,
+                delims: ('[', ']'),
+            },
+        }
+    }
+}
+
+
+// Step 6
+
+
+impl<Iter, B> Iterator for Progress<Iter, B>
+where
+    Iter: Iterator,
+    B: ProgressDisplay,
+{
+    type Item = Iter::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        println!("{}", CLEAR);
+        self.bounds.display(self);
+        self.i += 1;
+        self.iter.next()
+    }
+}
